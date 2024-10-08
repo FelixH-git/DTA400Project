@@ -39,6 +39,7 @@ class Virus_Simulation():
         self.hospitals = simpy.Resource(env, num_hospistals)
         self._total_people = []
         self._region_separation = {}
+    
     def init_world(self, population, regions:list):
         for person in range(population):
             new_person = Person()
@@ -75,18 +76,26 @@ class Virus_Simulation():
         for person in self._region_separation[_region]:
             print(person)
     
-    def spread(self, person):
+    def spread(self,env, person):
         """
         Function to spread the virus over some simulated time, for someone else to be infected they would need to be in the same region
         e.g. Two people in trollhättan can spread the infection to the other
         """
         #We check if the person is in the same region, a prerequistie for spreading
-        
         victim = random.Random(4434).choice(self._region_separation[person.region])
         
-        print(victim, "\n--Victim--\n", person, "\n--Infected perpetrator--\n")
-        #We choose a random person from the same region and try to infect
+        if person != victim:
+            #We choose a random person from the same region and try to infect
+            print(f"Person {person.id} Walks by person {victim.id} and has a {self._infection_rate*100}% to infect victim")
+            if random.random() < self._infection_rate:
+                print(f"Person {person.id} infects {victim.id}")
+                victim.infected = True
+                #yield env.timeout(1)
+            else:
+                print(f"Person {person.id} fails to infect victim {victim.id}")
+            print(victim, "\n--Victim--\n", person, "\n--Infected perpetrator--\n")
             
+                
 
     def intervention_method(self):
         """
@@ -123,24 +132,24 @@ class Virus_Simulation():
             print(person)
 
 def setup(env, num_hospitals, total_people):
-    simulation = Virus_Simulation(env, 0.20, num_hospitals)
+    simulation = Virus_Simulation(env, 0.70, num_hospitals)
 
     simulation.init_world(total_people, ["Trollhättan", "Mellerud", "Vänersborg"])
     
     simulation.infect()
     infected_people = simulation.get_infected()
-    simulation.spread(random.choice(infected_people))
+    simulation.spread(env, random.choice(infected_people))
     
     #simulation.print_region("Trollhättan")
     #simulation.print_region("Trollhättan")
     while(True):
         yield env.timeout(1)
-        env.process(simulation.progress_infection(env))
+        env.process(simulation.progress_infection(env, True))
         
         
     
 if __name__ == "__main__":
-    random.seed(42)
+    #random.seed(42)
     env = simpy.Environment()
     env.process(setup(env, 1, 10))
     env.run(until=30)
