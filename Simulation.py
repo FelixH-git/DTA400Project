@@ -24,7 +24,7 @@ class Person():
         self.dead = True
 
     def __str__(self):
-        format = f"Person            | {self.id}\nage               | {self.age}\ndead              | {self.dead}\ninfected          | {self.infected}\ntraveling         | {self.traveling}\nregion            | {self.region}\nvirus progression | {self.virus_progression}%\n"
+        format = f"\nPerson            | {self.id}\nage               | {self.age}\ndead              | {self.dead}\ninfected          | {self.infected}\ntraveling         | {self.traveling}\nregion            | {self.region}\nvirus progression | {self.virus_progression}%\n"
         return format
 
 class Virus_Simulation():
@@ -58,7 +58,6 @@ class Virus_Simulation():
         random_person = random.randint(0, len(self._total_people)-1)
         print(random_person)
         self._total_people[random_person].infected = True
-        #self._total_people[random_person].virus_progression += 1        
 
     def progress_infection(self, env, print_output=False):
         """
@@ -72,16 +71,22 @@ class Virus_Simulation():
                 yield env.timeout(1)
                 
 
-    def print_region(self, region):
-        print(self._region_separation[region])
+    def print_region(self, _region):
+        for person in self._region_separation[_region]:
+            print(person)
     
-    def spread(self):
+    def spread(self, person):
         """
         Function to spread the virus over some simulated time, for someone else to be infected they would need to be in the same region
         e.g. Two people in trollhättan can spread the infection to the other
         """
-        for person in self._total_people:
-            pass
+        #We check if the person is in the same region, a prerequistie for spreading
+        
+        victim = random.Random(4434).choice(self._region_separation[person.region])
+        
+        print(victim, "\n--Victim--\n", person, "\n--Infected perpetrator--\n")
+        #We choose a random person from the same region and try to infect
+            
 
     def intervention_method(self):
         """
@@ -93,11 +98,26 @@ class Virus_Simulation():
         """
         Prints Infected people
         """
+        infected_people = []
         for person in self._total_people:
             if person.infected == True:
+                infected_people.append(person)
                 print(person)
 
         print(f"\n----TOTAL INFECTED {self._total_infected}----")
+        return infected_people
+    
+    def get_infected(self):
+        """
+        Returns Infected people
+        """
+        infected_people = []
+        for person in self._total_people:
+            if person.infected == True:
+                infected_people.append(person)
+
+        return infected_people
+    
     def print_people(self):
         for person in self._total_people:
             print(person)
@@ -108,19 +128,21 @@ def setup(env, num_hospitals, total_people):
     simulation.init_world(total_people, ["Trollhättan", "Mellerud", "Vänersborg"])
     
     simulation.infect()
-    simulation.print_region("Vänersborg")
+    infected_people = simulation.get_infected()
+    simulation.spread(random.choice(infected_people))
+    
+    #simulation.print_region("Trollhättan")
+    #simulation.print_region("Trollhättan")
     while(True):
         yield env.timeout(1)
-        env.process(simulation.progress_infection(env, True))
+        env.process(simulation.progress_infection(env))
+        
         
     
 if __name__ == "__main__":
     random.seed(42)
     env = simpy.Environment()
     env.process(setup(env, 1, 10))
-    
     env.run(until=30)
     
 
-
-    #simulation.print_infected()
