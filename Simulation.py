@@ -144,11 +144,12 @@ def setup(env, num_hospitals, total_people):
     simulation.infect()
     infected_people = simulation.get_infected()
     random_person = random.randint(0, len([p for p in simulation._total_people if p.infected == True])-1)
+    env.process(simulation.spread(env, infected_people[random_person]))
 
+    simulation.print_infected()
     while(True):
         yield env.timeout(1)
         env.process(simulation.progress_infection(env, True))
-        env.process(simulation.spread(env, infected_people[random_person]))
         
     
 if __name__ == "__main__":
