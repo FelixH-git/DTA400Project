@@ -1,6 +1,6 @@
 import simpy
 import random
-
+import time
 import simpy.resources
 class Person():
     """
@@ -24,7 +24,7 @@ class Person():
         self.dead = True
 
     def __str__(self):
-        format = f"\nPerson            | {self.id}\nage               | {self.age}\ndead              | {self.dead}\ninfected          | {self.infected}\ntraveling         | {self.traveling}\nregion            | {self.region}\nvirus progression | {round(self.virus_progression,2)}%\n"
+        format = f"\nPerson            | {self.id}\nage               | {self.age}\ndead              | {self.dead}\ninfected          | {self.infected}\ntraveling         | {self.traveling}\nregion            | {self.region}\nvirus progression | {'▇'*int(self.virus_progression/10)}%\n"
         return format
 
 class Virus_Simulation():
@@ -71,6 +71,7 @@ class Virus_Simulation():
                 
                 if print_output:
                     print(f"Virus progression increased on Person {person.id} on day {env.now:.2f} Virus progression is now at {round(person.virus_progression, 2)}%.")
+                    print(person)
                 person.virus_progression += (1 * person.age/10 + random.randint(1,100)/100) * self._virus_growth
                 if person.virus_progression > 100:
                     person.virus_progression = 100
@@ -99,7 +100,8 @@ class Virus_Simulation():
                     victim.infected = True
                     if len([p for p in self.get_region(person.region) if p.infected == True]) > len(self.get_region(person.region)):
                         self._total_infected = len(self.get_region(person.region))
-                    self._total_infected += 1
+                    else:
+                        self._total_infected += 1
                     #yield env.timeout(1)
                 else:
                     print(f"Person {person.id} fails to infect victim {victim.id}")
@@ -129,6 +131,7 @@ class Virus_Simulation():
         Prints the number of total infected people
         """
         print(f"\n----TOTAL INFECTED {self._total_infected}----")
+    
     def write_log_file(self):
         pass
 
@@ -147,7 +150,7 @@ class Virus_Simulation():
 
 def setup(env, num_hospitals, total_people):
     
-    simulation = Virus_Simulation(env, 0.70, num_hospitals, 0.5)
+    simulation = Virus_Simulation(env, 0.20, num_hospitals, 0.5)
 
     simulation.init_world(total_people, ["Trollhättan", "Mellerud", "Vänersborg"])
     
@@ -157,12 +160,11 @@ def setup(env, num_hospitals, total_people):
 
     while(True):
         yield env.timeout(1)
-        infected_people = simulation.get_infected()
-
+        env.process(simulation.progress_infection(env, True))
+        time.sleep(1)
         #random_person = random.randint(0, len([p for p in simulation._total_people if p.infected == True])-1)
-        env.process(simulation.spread(env, random.choice(infected_people)))
-        simulation.print_total_infected()
-        print(f"TOTAL PEOPLE IN REGION {len(simulation.get_region("Vänersborg"))}")
+        #env.process(simulation.spread(env, random.choice(infected_people)))
+        #simulation.print_total_infected()
 
         #env.process(simulation.progress_infection(env, True))
         
@@ -170,7 +172,7 @@ def setup(env, num_hospitals, total_people):
 if __name__ == "__main__":
     random.seed(42)
     env = simpy.Environment()
-    env.process(setup(env, 1, 100))
-    env.run(until=30)
+    env.process(setup(env, 1, 10))
+    env.run(until=60)
     
 
