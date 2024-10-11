@@ -36,10 +36,11 @@ class Virus_Simulation():
     def __init__(self, env, infection_rate, num_hospistals, virus_growth_multiplier):
         self._total_infected = 0
         self._infection_rate = infection_rate
-        self.hospitals = simpy.Resource(env, num_hospistals)
+        self.hospital_space = simpy.Resource(env, num_hospistals)
         self._total_people = []
         self._region_separation = {}
         self._virus_growth = virus_growth_multiplier
+
     
     def init_world(self, population, regions:list):
         for person in range(population):
@@ -89,6 +90,8 @@ class Virus_Simulation():
         """
         #We check if the person is in the same region, a prerequistie for spreading
         while self._total_infected < len(self._total_people):
+            if person.dead == True:
+                return
             yield env.timeout(1)
             victim = random.choice(self._region_separation[person.region])
             
@@ -107,7 +110,32 @@ class Virus_Simulation():
                     print(f"Person {person.id} fails to infect victim {victim.id}")
                 print(victim, "\n--Victim--\n", person, "\n--Infected perpetrator--\n")
                 
-                
+
+    def hospitalize(self, env, person: Person):
+        """
+        Person goes to a hosiptial based on how far the virus progression is, a younger person
+        might not have as much "symptoms" but an older person will get sick much faster and
+        therefor a higher coeffecient
+        """            
+        symptom_to_go_to_hospital = (person.virus_progression/100) * person.age/10
+        if random.random() * 10 < symptom_to_go_to_hospital:    
+            print(f"Person {person.id} arrives at the hospital requesting a spot in a bed on day {env.now:.2f}")
+
+            with self.hospital_space.request() as req:
+                yield req
+
+                yield env.timeout(int(2*person.age/10))
+
+                if random.random() < 0.01*(person.age/10)*person.virus_progression/10:
+                    person.die()
+                    print(f"Person {person.id} Died from their symptoms at {env.now:.2f}")
+                else:
+                    person.virus_progression = 0
+                    person.infected = False
+                    print(f"Person {person.id} survived their symptoms and they are released at {env.now:.2f}")
+
+
+
 
     def intervention_method(self):
         """
@@ -137,7 +165,7 @@ class Virus_Simulation():
 
     def get_infected(self):
         """
-        Returns Infected people
+        Returns Infected people Else empty list
         """
         return [p for p in self._total_people if p.infected == True]
 
@@ -148,20 +176,27 @@ class Virus_Simulation():
         for person in self._total_people:
             print(person)
 
+    def print_person(self, person_id):
+        for person in self._total_people:
+            if person.id == person_id:
+                print(person)
 def setup(env, num_hospitals, total_people):
     
-    simulation = Virus_Simulation(env, 0.20, num_hospitals, 0.5)
+    simulation = Virus_Simulation(env, 0.20, num_hospitals, 3)
 
-    simulation.init_world(total_people, ["Trollhättan", "Mellerud", "Vänersborg"])
+    simulation.init_world(total_people, ["Trollhättan"])
     
     simulation.infect()
     
-    simulation.print_infected()
+    #simulation.print_infected()
 
     while(True):
         yield env.timeout(1)
         env.process(simulation.progress_infection(env, True))
-        time.sleep(1)
+    #    env.process(simulation.spread(env, random.choice(simulation.get_region('Trollhättan'))))
+        env.process(simulation.hospitalize(env, random.choice(simulation.get_infected())))
+
+    #    simulation.print_person(11)
         #random_person = random.randint(0, len([p for p in simulation._total_people if p.infected == True])-1)
         #env.process(simulation.spread(env, random.choice(infected_people)))
         #simulation.print_total_infected()
@@ -172,7 +207,7 @@ def setup(env, num_hospitals, total_people):
 if __name__ == "__main__":
     random.seed(42)
     env = simpy.Environment()
-    env.process(setup(env, 1, 10))
+    env.process(setup(env, 1, 20))
     env.run(until=60)
     
 
