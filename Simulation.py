@@ -46,7 +46,7 @@ class Virus_Simulation():
             new_person = Person()
             new_person.id = person
             new_person.region = random.choice(regions)
-            new_person.age = random.randint(20,80)
+            new_person.age = random.randint(1,45) + random.randint(1,45)
             self._total_people.append(new_person)
 
         for _region in regions:
@@ -87,20 +87,24 @@ class Virus_Simulation():
         e.g. Two people in trollhättan can spread the infection to the other
         """
         #We check if the person is in the same region, a prerequistie for spreading
-        yield env.timeout(1)
-        victim = random.Random(4434).choice(self._region_separation[person.region])
-        
-        if person != victim:
-            #We choose a random person from the same region and try to infect
-            print(f"Person {person.id} Walks by person {victim.id} and has a {self._infection_rate*100}% to infect victim")
-            if random.random() < self._infection_rate:
-                print(f"Person {person.id} infects {victim.id}")
-                victim.infected = True
-                #yield env.timeout(1)
-            else:
-                print(f"Person {person.id} fails to infect victim {victim.id}")
-            print(victim, "\n--Victim--\n", person, "\n--Infected perpetrator--\n")
+        while self._total_infected < len(self._total_people):
+            yield env.timeout(1)
+            victim = random.choice(self._region_separation[person.region])
             
+            if person != victim and not victim.infected:
+                #We choose a random person from the same region and try to infect
+                print(f"Person {person.id} Walks by person {victim.id} on day {env.now:.2f} and has a {self._infection_rate*100}% to infect victim")
+                if random.random() < self._infection_rate:
+                    print(f"Person {person.id} infects {victim.id}")
+                    victim.infected = True
+                    if len([p for p in self.get_region(person.region) if p.infected == True]) > len(self.get_region(person.region)):
+                        self._total_infected = len(self.get_region(person.region))
+                    self._total_infected += 1
+                    #yield env.timeout(1)
+                else:
+                    print(f"Person {person.id} fails to infect victim {victim.id}")
+                print(victim, "\n--Victim--\n", person, "\n--Infected perpetrator--\n")
+                
                 
 
     def intervention_method(self):
@@ -114,15 +118,17 @@ class Virus_Simulation():
         Prints Infected people
         """
         print("--------------------------")
-        infected_people = []
         for person in self._total_people:
             if person.infected == True:
-                infected_people.append(person)
                 print(person)
 
         print(f"\n----TOTAL INFECTED {self._total_infected}----")
-        return infected_people
     
+    def print_total_infected(self):
+        """
+        Prints the number of total infected people
+        """
+        print(f"\n----TOTAL INFECTED {self._total_infected}----")
     def write_log_file(self):
         pass
 
@@ -131,6 +137,10 @@ class Virus_Simulation():
         Returns Infected people
         """
         return [p for p in self._total_people if p.infected == True]
+
+    def get_region(self, region):
+        return [p for p in self._total_people if p.region == region]
+
     def print_people(self):
         for person in self._total_people:
             print(person)
@@ -142,20 +152,25 @@ def setup(env, num_hospitals, total_people):
     simulation.init_world(total_people, ["Trollhättan", "Mellerud", "Vänersborg"])
     
     simulation.infect()
-    infected_people = simulation.get_infected()
-    random_person = random.randint(0, len([p for p in simulation._total_people if p.infected == True])-1)
-    env.process(simulation.spread(env, infected_people[random_person]))
-
+    
     simulation.print_infected()
+
     while(True):
         yield env.timeout(1)
-        env.process(simulation.progress_infection(env, True))
+        infected_people = simulation.get_infected()
+
+        #random_person = random.randint(0, len([p for p in simulation._total_people if p.infected == True])-1)
+        env.process(simulation.spread(env, random.choice(infected_people)))
+        simulation.print_total_infected()
+        print(f"TOTAL PEOPLE IN REGION {len(simulation.get_region("Vänersborg"))}")
+
+        #env.process(simulation.progress_infection(env, True))
         
     
 if __name__ == "__main__":
-    #random.seed(42)
+    random.seed(42)
     env = simpy.Environment()
-    env.process(setup(env, 1, 10))
+    env.process(setup(env, 1, 100))
     env.run(until=30)
     
 
