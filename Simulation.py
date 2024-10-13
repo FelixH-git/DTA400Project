@@ -2,6 +2,7 @@ import simpy
 import random
 import time
 import simpy.resources
+import csv
 class Person():
     """
     Fundamental object of the virus simulation
@@ -40,6 +41,7 @@ class Virus_Simulation():
         self._total_people = []
         self._region_separation = {}
         self._virus_growth = virus_growth_multiplier
+        self._growth_list = []
 
     
     def init_world(self, population, regions:list):
@@ -95,6 +97,7 @@ class Virus_Simulation():
             yield env.timeout(1)
             victim = random.choice(self._region_separation[person.region])
             
+            
             if person != victim and not victim.infected:
                 #We choose a random person from the same region and try to infect
                 print(f"Person {person.id} Walks by person {victim.id} on day {env.now:.2f} and has a {self._infection_rate*100}% to infect victim")
@@ -105,6 +108,7 @@ class Virus_Simulation():
                         self._total_infected = len(self.get_region(person.region))
                     else:
                         self._total_infected += 1
+                        self._growth_list.append(self._total_infected)
                     #yield env.timeout(1)
                 else:
                     print(f"Person {person.id} fails to infect victim {victim.id}")
@@ -160,8 +164,28 @@ class Virus_Simulation():
         """
         print(f"\n----TOTAL INFECTED {self._total_infected}----")
     
-    def write_log_file(self):
-        pass
+    def write_log_file(self, days):
+        
+        fields_people = ['id', 'age', 'region']
+        fields_growth = ['day', 'total_infected']
+        people_rows = []
+        growth_rows = []
+        for person in self._total_people:
+            people_rows.append([f'{person.id}', f'{person.age}', f'{person.region}'])
+        
+        for day_worth in self._growth_list:
+            growth_rows.append([f'{day_worth}', f'{self._growth_list[day_worth]}'])
+                
+        with open("people.csv", "w") as f:
+            csvwriter = csv.writer(f)
+            csvwriter.writerow(fields_people)
+            csvwriter.writerows(people_rows)
+        
+        with open("growth.csv", "w") as f:
+            csvwriter = csv.writer(f)
+            csvwriter.writerow(fields_growth)
+            csvwriter.writerows(growth_rows)
+            
 
     def get_infected(self):
         """
@@ -182,20 +206,25 @@ class Virus_Simulation():
                 print(person)
 def setup(env, num_hospitals, total_people):
     
-    simulation = Virus_Simulation(env, 0.20, num_hospitals, 3)
+    simulation = Virus_Simulation(env, 0.2, num_hospitals, 3)
 
     simulation.init_world(total_people, ["Trollhättan"])
     
     simulation.infect()
-    
+    t_inter = 3
     #simulation.print_infected()
-
+    days = []
+    infection_per_day = []
     while(True):
-        yield env.timeout(1)
+        yield env.timeout(random.randint(t_inter - 2, t_inter+2))
         env.process(simulation.progress_infection(env, True))
-    #    env.process(simulation.spread(env, random.choice(simulation.get_region('Trollhättan'))))
+        env.process(simulation.spread(env, random.choice(simulation.get_region('Trollhättan'))))
+        
         env.process(simulation.hospitalize(env, random.choice(simulation.get_infected())))
-
+        
+        days.append(env.now)
+        #infection_per_day.append(simulation._total_infected)
+        simulation.write_log_file(days)
     #    simulation.print_person(11)
         #random_person = random.randint(0, len([p for p in simulation._total_people if p.infected == True])-1)
         #env.process(simulation.spread(env, random.choice(infected_people)))
@@ -207,7 +236,7 @@ def setup(env, num_hospitals, total_people):
 if __name__ == "__main__":
     random.seed(42)
     env = simpy.Environment()
-    env.process(setup(env, 1, 20))
-    env.run(until=60)
+    env.process(setup(env, 1, 100))
+    env.run(until=600)
     
 
