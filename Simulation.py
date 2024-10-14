@@ -42,7 +42,9 @@ class Virus_Simulation():
         self._region_separation = {}
         self._virus_growth = virus_growth_multiplier
         self._growth_list = []
-
+        self._stay_in_hospital = [] #Stays in hostpial
+        self._hosptilizations = [] #how many hospitilizations
+        
     
     def init_world(self, population, regions:list):
         for person in range(population):
@@ -71,7 +73,6 @@ class Virus_Simulation():
         for person in self._total_people:
             if person.infected:
                 yield env.timeout(1)
-                
                 if print_output:
                     print(f"Virus progression increased on Person {person.id} on day {env.now:.2f} Virus progression is now at {round(person.virus_progression, 2)}%.")
                     print(person)
@@ -127,16 +128,17 @@ class Virus_Simulation():
 
             with self.hospital_space.request() as req:
                 yield req
-
+                print(f"Person {person.id} stays at the hospital for {int(2*person.age/10)} days")
+                
                 yield env.timeout(int(2*person.age/10))
-
+                self._stay_in_hospital.append(int(2*person.age/10))
                 if random.random() < 0.01*(person.age/10)*person.virus_progression/10:
                     person.die()
                     print(f"Person {person.id} Died from their symptoms at {env.now:.2f}")
                 else:
                     person.virus_progression = 0
                     person.infected = False
-                    print(f"Person {person.id} survived their symptoms and they are released at {env.now:.2f}")
+                    print(f"Person {person.id} survived their symptoms and they are released on day {env.now:.2f}")
 
 
 
@@ -168,13 +170,15 @@ class Virus_Simulation():
         
         fields_people = ['id', 'age', 'region']
         fields_growth = ['day', 'total_infected']
+        fields_stay_in_hostpial = ['days']
         people_rows = []
         growth_rows = []
+        stay_in_hospital_rows = []
         for person in self._total_people:
             people_rows.append([f'{person.id}', f'{person.age}', f'{person.region}'])
         
-        for day_worth in self._growth_list:
-            growth_rows.append([f'{day_worth}', f'{self._growth_list[day_worth]}'])
+        for time_in_hospital in self._stay_in_hospital:
+            stay_in_hospital_rows.append([f'{time_in_hospital}'])
                 
         with open("people.csv", "w") as f:
             csvwriter = csv.writer(f)
@@ -185,7 +189,11 @@ class Virus_Simulation():
             csvwriter = csv.writer(f)
             csvwriter.writerow(fields_growth)
             csvwriter.writerows(growth_rows)
-            
+        
+        with open("stay_in_hospital.csv", "w") as f:
+            csvwriter = csv.writer(f)
+            csvwriter.writerow(fields_stay_in_hostpial)
+            csvwriter.writerows(stay_in_hospital_rows)
 
     def get_infected(self):
         """
@@ -206,7 +214,7 @@ class Virus_Simulation():
                 print(person)
 def setup(env, num_hospitals, total_people):
     
-    simulation = Virus_Simulation(env, 0.2, num_hospitals, 3)
+    simulation = Virus_Simulation(env, 0.2, num_hospitals, 30)
 
     simulation.init_world(total_people, ["Trollhättan"])
     
@@ -223,20 +231,14 @@ def setup(env, num_hospitals, total_people):
         env.process(simulation.hospitalize(env, random.choice(simulation.get_infected())))
         
         days.append(env.now)
-        #infection_per_day.append(simulation._total_infected)
         simulation.write_log_file(days)
-    #    simulation.print_person(11)
-        #random_person = random.randint(0, len([p for p in simulation._total_people if p.infected == True])-1)
-        #env.process(simulation.spread(env, random.choice(infected_people)))
-        #simulation.print_total_infected()
 
-        #env.process(simulation.progress_infection(env, True))
         
     
 if __name__ == "__main__":
     random.seed(42)
     env = simpy.Environment()
-    env.process(setup(env, 1, 100))
+    env.process(setup(env, 3, 1000))
     env.run(until=600)
     
 
