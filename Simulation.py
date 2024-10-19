@@ -44,8 +44,8 @@ class Virus_Simulation():
         self._growth_list = []
         self._stay_in_hospital = [] #Stays in hostpial
         self._hosptilizations = [] #how many hospitilizations
-        
-    
+        self._people_in_que = {}
+        self._arrival_rate = {}
     def init_world(self, population, regions:list):
         for person in range(population):
             new_person = Person()
@@ -116,29 +116,38 @@ class Virus_Simulation():
                 print(victim, "\n--Victim--\n", person, "\n--Infected perpetrator--\n")
                 
 
-    def hospitalize(self, env, person: Person):
+    def hospitalize(self, env):
         """
         Person goes to a hosiptial based on how far the virus progression is, a younger person
         might not have as much "symptoms" but an older person will get sick much faster and
         therefor a higher coeffecient
-        """            
-        symptom_to_go_to_hospital = (person.virus_progression/100) * person.age/10
-        if random.random() * 10 < symptom_to_go_to_hospital:    
-            print(f"Person {person.id} arrives at the hospital requesting a spot in a bed on day {env.now:.2f}")
+        """ 
+        
+        self._arrival_rate.update({env.now:0})
+        
+        for person in self.get_infected():
+            if env.now in self._arrival_rate:
+                self._arrival_rate[env.now] += 1
+            
+            symptom_to_go_to_hospital = (person.virus_progression/100) * person.age/10
+            if random.random() < 0.5:    
+                print(f"Person {person.id} arrives at the hospital requesting a spot in a bed on day {env.now:.2f}")
 
-            with self.hospital_space.request() as req:
-                yield req
-                print(f"Person {person.id} stays at the hospital for {int(2*person.age/10)} days")
-                
-                yield env.timeout(int(2*person.age/10))
-                self._stay_in_hospital.append(int(2*person.age/10))
-                if random.random() < 0.01*(person.age/10)*person.virus_progression/10:
-                    person.die()
-                    print(f"Person {person.id} Died from their symptoms at {env.now:.2f}")
-                else:
-                    person.virus_progression = 0
-                    person.infected = False
-                    print(f"Person {person.id} survived their symptoms and they are released on day {env.now:.2f}")
+                with self.hospital_space.request() as req:
+                    yield req
+                    print(f"Person {person.id} stays at the hospital for {int(2*person.age/10)} days")
+                    self._people_in_que.update({env.now : len(self.hospital_space.queue)})           
+
+                    yield env.timeout(int(2*person.age/10))
+                    self._stay_in_hospital.append([int(2*person.age/10), env.now])
+                    
+                    if random.random() < 0.01*(person.age/10)*person.virus_progression/10:
+                        person.die()
+                        print(f"Person {person.id} Died from their symptoms at {env.now:.2f}")
+                    else:
+                        person.virus_progression = 0
+                        person.infected = False
+                        print(f"Person {person.id} survived their symptoms and they are released on day {env.now:.2f}")
 
 
 
@@ -195,6 +204,16 @@ class Virus_Simulation():
             csvwriter.writerow(fields_stay_in_hostpial)
             csvwriter.writerows(stay_in_hospital_rows)
 
+        with open("people_in_que.csv", "w") as f:
+            csvwriter = csv.writer(f)
+            csvwriter.writerow(['day', 'people_in_que'])
+            csvwriter.writerows(self._people_in_que.items())
+    
+        with open("arrival_rate.csv", "w") as f:
+            csvwriter = csv.writer(f)
+            csvwriter.writerow(['day', 'arrivals'])
+            csvwriter.writerows(self._arrival_rate.items())
+    
     def get_infected(self):
         """
         Returns Infected people Else empty list
@@ -214,7 +233,7 @@ class Virus_Simulation():
                 print(person)
 def setup(env, num_hospitals, total_people):
     
-    simulation = Virus_Simulation(env, 0.2, num_hospitals, 30)
+    simulation = Virus_Simulation(env, 0.2, num_hospitals, 1)
 
     simulation.init_world(total_people, ["Trollhättan"])
     
@@ -225,10 +244,11 @@ def setup(env, num_hospitals, total_people):
     infection_per_day = []
     while(True):
         yield env.timeout(random.randint(t_inter - 2, t_inter+2))
+        env.process(simulation.hospitalize(env))
+
         env.process(simulation.progress_infection(env, True))
         env.process(simulation.spread(env, random.choice(simulation.get_region('Trollhättan'))))
         
-        env.process(simulation.hospitalize(env, random.choice(simulation.get_infected())))
         
         days.append(env.now)
         simulation.write_log_file(days)
@@ -238,7 +258,7 @@ def setup(env, num_hospitals, total_people):
 if __name__ == "__main__":
     random.seed(42)
     env = simpy.Environment()
-    env.process(setup(env, 3, 1000))
-    env.run(until=600)
+    env.process(setup(env, 1, 80000))
+    env.run(until=182)
     
 
