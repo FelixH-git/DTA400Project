@@ -51,7 +51,10 @@ class Virus_Simulation():
             new_person = Person()
             new_person.id = person
             new_person.region = random.choice(regions)
-            new_person.age = random.randint(1,45) + random.randint(1,45)
+            new_person.age = random.randint(1,45) + random.randint(1,45)  
+            new_person.infected = bool(random.randint(0,1))
+            if new_person.infected:
+                new_person.virus_progression = random.randint(0,100)
             self._total_people.append(new_person)
 
         for _region in regions:
@@ -70,6 +73,7 @@ class Virus_Simulation():
         """
         Some function to increase the virus progression over the simulation time
         """
+        
         for person in self._total_people:
             if person.infected:
                 yield env.timeout(1)
@@ -79,6 +83,7 @@ class Virus_Simulation():
                 person.virus_progression += (1 * person.age/10 + random.randint(1,100)/100) * self._virus_growth
                 if person.virus_progression > 100:
                     person.virus_progression = 100
+                
 
                 
 
@@ -92,10 +97,11 @@ class Virus_Simulation():
         e.g. Two people in trollhättan can spread the infection to the other
         """
         #We check if the person is in the same region, a prerequistie for spreading
+        
         while self._total_infected < len(self._total_people):
-            if person.dead == True:
-                return
             yield env.timeout(1)
+            if person.dead == True:
+                return         
             victim = random.choice(self._region_separation[person.region])
             
             
@@ -110,7 +116,6 @@ class Virus_Simulation():
                     else:
                         self._total_infected += 1
                         self._growth_list.append(self._total_infected)
-                    #yield env.timeout(1)
                 else:
                     print(f"Person {person.id} fails to infect victim {victim.id}")
                 print(victim, "\n--Victim--\n", person, "\n--Infected perpetrator--\n")
@@ -130,12 +135,12 @@ class Virus_Simulation():
                 self._arrival_rate[env.now] += 1
             
             symptom_to_go_to_hospital = (person.virus_progression/100) * person.age/10
-            if random.random() < 0.5:    
+            if random.random() < symptom_to_go_to_hospital:    
                 print(f"Person {person.id} arrives at the hospital requesting a spot in a bed on day {env.now:.2f}")
-
+                
                 with self.hospital_space.request() as req:
-                    yield req
                     print(f"Person {person.id} stays at the hospital for {int(2*person.age/10)} days")
+                    
                     self._people_in_que.update({env.now : len(self.hospital_space.queue)})           
 
                     yield env.timeout(int(2*person.age/10))
@@ -237,7 +242,7 @@ def setup(env, num_hospitals, total_people):
 
     simulation.init_world(total_people, ["Trollhättan"])
     
-    simulation.infect()
+    #simulation.infect()
     t_inter = 3
     #simulation.print_infected()
     days = []
@@ -245,9 +250,8 @@ def setup(env, num_hospitals, total_people):
     while(True):
         yield env.timeout(random.randint(t_inter - 2, t_inter+2))
         env.process(simulation.hospitalize(env))
-
-        env.process(simulation.progress_infection(env, True))
-        env.process(simulation.spread(env, random.choice(simulation.get_region('Trollhättan'))))
+        #env.process(simulation.progress_infection(env, True))
+        #env.process(simulation.spread(env, random.choice(simulation.get_region('Trollhättan'))))
         
         
         days.append(env.now)
@@ -258,7 +262,7 @@ def setup(env, num_hospitals, total_people):
 if __name__ == "__main__":
     random.seed(42)
     env = simpy.Environment()
-    env.process(setup(env, 1, 80000))
-    env.run(until=182)
+    env.process(setup(env, 5, 100))
+    env.run(until=100000)
     
 
