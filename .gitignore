@@ -2,3 +2,4 @@
 *.png
 *.csv
 /__pycache__
+Simulation.py

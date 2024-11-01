@@ -25,7 +25,7 @@ import numpy as np
 
 RANDOM_SEED = 42
 NUM_BEDS = 50  # Number of machines in the carwash    # Minutes it takes to clean a car
-T_INTER = 10       # Create a car every ~7 minutes
+T_INTER = 10       # 
 SIM_TIME = T_INTER * 100    # Simulation time in minutes
 VIRUS_SEVERITY = 1
 QUE_LIMIT = 5
@@ -78,7 +78,7 @@ def person(env, person, hospital : Hospital, symptom_severity, age):
     with hospital.beds.request() as request:
         result = yield request | env.timeout(arrive)
         hospital.server_utilization.update({round(env.now, 2) : hospital.beds.count/hospital.beds.capacity})
-        hospital.que_length.update({round(env.now, 2) : len(hospital.beds.queue)})
+        hospital.que_length.update({round(env.now, 2) : round(len(hospital.beds.queue)/env.now,2) * 100})
         if request in result:
             hospital.person_request.update({person : request})
             print(f'{person} begins treatment at {env.now:.2f}.')
@@ -86,7 +86,7 @@ def person(env, person, hospital : Hospital, symptom_severity, age):
             print(f'{person} leaves the hospital at {env.now:.2f}.')
         else:
             waiting_time = env.now - arrive
-            hospital.waiting_time.append(waiting_time)
+            hospital.waiting_time.append(waiting_time/env.now)
             
 def write_csv_file(data : dict | list, fields, filename):
     
@@ -119,7 +119,7 @@ def setup(env, num_beds, t_inter):
         if len(hospital.treat_time) > 0:
             avg_job_time.update({env.now : sum(hospital.treat_time)/len(hospital.treat_time)})
             dead_people_dict.update({env.now : hospital.dead_people})
-            arrival_rate_dict.update({env.now : hospital.arrivals})
+            arrival_rate_dict.update({env.now : round(hospital.arrivals/env.now, 2)})
             write_csv_file(arrival_rate_dict, ['hour', 'arrival_rate'], "arrival_rate.csv")
             write_csv_file(dead_people_dict, ['hour', 'amount_dead_people'], "dead_people.csv")
             write_csv_file(avg_job_time, ['hour', 'avg_job_time'], "Jobtime.csv")
@@ -133,7 +133,7 @@ random.seed(RANDOM_SEED)  # This helps to reproduce the results
 
 # Create an environment and start the setup process
 env = simpy.Environment()
-env.process(setup(env, 10, T_INTER))
+env.process(setup(env, 15, T_INTER))
 
 # Execute!
 env.run(until=SIM_TIME)
